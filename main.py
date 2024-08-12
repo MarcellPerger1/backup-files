@@ -194,16 +194,16 @@ class ListFiles:
     def _walk(self, includes: Sequence[AbstractInclude],
               excludes: Sequence[AbstractExclude]):
         """Lists all files and dirs, adding ``includes - excludes`` to self"""
+        excludes = list(excludes)
         roots = set()
         for o in includes:
             for p in o.get_paths():
                 self._assert_not_exotic(p)
                 if p.is_file():
-                    # TODO: this may be ignored by one of the excludes and that doesn't work
-                    self.add_file(p)
+                    self._add_file_with_excludes(excludes, p)
                 else:
                     roots.add(p)
-        return self._walk_roots(roots, list(excludes))
+        return self._walk_roots(roots, excludes)
 
     def _walk_roots(self, roots: set[Path], excludes: list[AbstractExclude]):
         visited_dirs: set[Path] = set()
@@ -225,12 +225,14 @@ class ListFiles:
                     continue  # Don't add content (skip the code below)
 
                 for file in files:
-                    filepath = dirpath / file
-                    self._assert_not_exotic(filepath)
-                    if not self.should_exclude_file(excludes, filepath):
-                        self.add_file(filepath)
+                    self._add_file_with_excludes(excludes, dirpath / file)
                 # Don't do anything with the dirs here, will handle them
                 #  when os.walk() recursively goes into them (topdown)
+
+    def _add_file_with_excludes(self, excludes: list[AbstractExclude], file: Path):
+        assert file.is_file(), "Expected a file, not dir/exotic"
+        if not self.should_exclude_file(excludes, file):
+            self.add_file(file)
 
     # noinspection PyMethodMayBeStatic
     def should_exclude_file(self, excludes: list[AbstractExclude], file: Path):
