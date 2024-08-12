@@ -163,6 +163,71 @@ class ListFiles:
         self.include_blocks: list[list[...]] = []
         self.exclude_blocks: list[list[...]] = []
 
+    def list_files(self):
+        for i, includes in enumerate(self.include_blocks):  # For each include,
+            excludes = flatten(self.exclude_blocks[i:])  # Use the excludes below it
+            self._walk(includes, excludes)  # And add `includes - excludes_below_it`
+
+    def _walk(self, includes: Sequence[_IAnyInclude], excludes: Sequence[_IAnyExclude]):
+        """Lists all files and dirs, adding ``includes - excludes`` to self"""
+        roots = set()
+        for o in includes:
+            for p in o.get_paths():
+                if p.is_file():
+                    self.add_file(p)
+                else:
+                    assert p.is_dir(), "Exotic structures (e.g. symlinks) aren't supported"
+                    roots.add(p)
+        return self._walk_roots(roots, list(excludes))
+
+    def _walk_roots(self, roots: set[Path], excludes: list[_IAnyExclude]):
+        visited_dirs: set[Path] = set()
+        for root in roots:
+            assert root.is_dir(), "Cannot have a non-dir root in _walk"
+            for dir_str, dirs, files in os.walk(root.expanduser().resolve()):
+                dirpath = Path(dir_str).resolve()
+                if dirpath in visited_dirs:
+                    # Already visited this tree, don't visit children
+                    dirs.clear()
+                    continue
+                visited_dirs.add(dirpath)
+
+                excl_mode = self.get_dir_exclude_mode(excludes, dirpath)
+                if not excl_mode.exclude_self():
+                    self.add_dir_only(dirpath)
+                if excl_mode.exclude_contents():
+                    dirs.clear()  # Don't recurse into dirs
+                    continue  # Don't add content (skip the code below)
+
+                for file in files:
+                    filepath = dirpath / file
+                    assert filepath.is_file(), \
+                        "Found exotic structure (e.g. junction/symlink)"
+                    if not self.should_exclude_file(excludes, filepath):
+                        self.add_file(filepath)
+                # Don't do anything with the dirs here, will handle them
+                #  when os.walk() recursively goes into them (topdown)
+
+    # noinspection PyMethodMayBeStatic
+    def should_exclude_file(self, excludes: list[_IAnyExclude], file: Path):
+        for e in excludes:
+            if isinstance(e, IFileExclude) and e.should_exclude(file, FsType.FILE):
+                return True
+        return False
+
+    # noinspection PyMethodMayBeStatic
+    def get_dir_exclude_mode(self, excludes: list[_IAnyExclude], path: Path):
+        result = ExcludeDirMode.NO
+        for e in excludes:
+            if not isinstance(e, IDirExclude):
+                continue
+            # Largest value (= largest amount excluded) wins
+            result = max(result, e.exclude_mode_for(path, FsType.DIR))
+            if result == ExcludeDirMode.ALL:
+                # Excluding everything already, no need to go further
+                return result
+        return result
+
     def add_file(self, file: Path):
         if file in self.files:
             return
@@ -183,71 +248,6 @@ class ListFiles:
             return
         self.stats.remove_file(file)
         self.files.remove(file)
-
-    # noinspection PyMethodMayBeStatic
-    def should_exclude_file(self, excludes: list[_IAnyExclude], file: Path):
-        for e in excludes:
-            if isinstance(e, IFileExclude) and e.should_exclude(file, FsType.FILE):
-                return True
-        return False
-
-    # noinspection PyMethodMayBeStatic
-    def get_exclude_mode(self, excludes: list[_IAnyExclude], path: Path):
-        result = ExcludeDirMode.NO
-        for e in excludes:
-            if not isinstance(e, IDirExclude):
-                continue
-            # Largest value (= largest amount excluded) wins
-            result = max(result, e.exclude_mode_for(path, FsType.DIR))
-            if result == ExcludeDirMode.ALL:
-                # Excluding everything already, no need to go further
-                return result
-        return result
-
-    def _walk_roots(self, roots: set[Path], excludes: list[_IAnyExclude]):
-        visited_dirs: set[Path] = set()
-        for root in roots:
-            assert root.is_dir(), "Cannot have a non-dir root in _walk"
-            for dir_str, dirs, files in os.walk(root.expanduser().resolve()):
-                dirpath = Path(dir_str).resolve()
-                if dirpath in visited_dirs:
-                    # Already visited this tree, don't visit children
-                    dirs.clear()
-                    continue
-                visited_dirs.add(dirpath)
-
-                excl_mode = self.get_exclude_mode(excludes, dirpath)
-                if not excl_mode.exclude_self():
-                    self.add_dir_only(dirpath)
-                if excl_mode.exclude_contents():
-                    dirs.clear()  # Don't recurse into dirs
-                    continue  # Don't add content (skip the code below)
-
-                for file in files:
-                    filepath = dirpath / file
-                    assert filepath.is_file(), \
-                        "Found exotic structure (e.g. junction/symlink)"
-                    if not self.should_exclude_file(excludes, filepath):
-                        self.add_file(filepath)
-                # Don't do anything with the dirs here, will handle them
-                #  when os.walk() recursively goes into them (topdown)
-
-    def _walk(self, includes: Sequence[_IAnyInclude], excludes: Sequence[_IAnyExclude]):
-        """Lists all files and dirs, adding ``includes - excludes`` to self"""
-        roots = set()
-        for o in includes:
-            for p in o.get_paths():
-                if p.is_file():
-                    self.add_file(p)
-                else:
-                    assert p.is_dir(), "Exotic structures (e.g. symlinks) aren't supported"
-                    roots.add(p)
-        return self._walk_roots(roots, list(excludes))
-
-    def list_files(self):
-        for i, includes in enumerate(self.include_blocks):  # For each include,
-            excludes = flatten(self.exclude_blocks[i:])  # Use the excludes below it
-            self._walk(includes, excludes)  # And add `includes - excludes_below_it`
 
 
 class Backup:
