@@ -197,10 +197,11 @@ class ListFiles:
         roots = set()
         for o in includes:
             for p in o.get_paths():
+                self._assert_not_exotic(p)
                 if p.is_file():
+                    # TODO: this may be ignored by one of the excludes and that doesn't work
                     self.add_file(p)
                 else:
-                    assert p.is_dir(), "Exotic structures (e.g. symlinks) aren't supported"
                     roots.add(p)
         return self._walk_roots(roots, list(excludes))
 
@@ -225,8 +226,7 @@ class ListFiles:
 
                 for file in files:
                     filepath = dirpath / file
-                    assert filepath.is_file(), \
-                        "Found exotic structure (e.g. junction/symlink)"
+                    self._assert_not_exotic(filepath)
                     if not self.should_exclude_file(excludes, filepath):
                         self.add_file(filepath)
                 # Don't do anything with the dirs here, will handle them
@@ -272,6 +272,12 @@ class ListFiles:
             return
         self.stats.remove_file(file)
         self.files.remove(file)
+
+    @staticmethod
+    def _assert_not_exotic(path: Path):
+        """Assert that path is a regular file or a directory"""
+        assert path.is_file() or path.is_dir(), (
+            "Exotic structures (e.g. symlinks) are not currently supported")
 
 
 class Backup:
