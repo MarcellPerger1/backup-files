@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TypeVar, TypeGuard, Iterable
+import itertools
+from typing import TypeVar, TypeGuard, Iterable, Callable, Iterator
 
 T = TypeVar('T')
+KT = TypeVar('KT')
 
 
 # Note: this must be TypeGuard NOT TypeIs because
@@ -27,3 +29,8 @@ def _is_actual_iterable(o: object) -> TypeGuard[Iterable]:
 #  always gets bound to `T` (even if it is iterable) as it always matches `T`
 def flatten(ls: Iterable[Iterable[T] | T]) -> list[T]:
     return [item for sub in ls for item in (sub if _is_actual_iterable(sub) else [sub])]
+
+
+def group_by(it: Iterable[T], key: Callable[[T], KT]) -> Iterator[tuple[KT, Iterator[T]]]:
+    """Same as itertools.groupby but with types that Pycharm recognizes"""
+    return itertools.groupby(it, key=key)

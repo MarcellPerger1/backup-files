@@ -9,7 +9,7 @@ from enum import StrEnum, IntEnum
 from pathlib import Path
 from typing import Sequence
 
-from py_util import flatten
+from py_util import flatten, group_by
 
 
 class FsType(StrEnum):
@@ -150,23 +150,46 @@ class Stats:
 
 
 class ListFiles:
-    def __init__(self):
+    """NOTE: decls has later overrides earlier in all cases.
+    It must also start with an include block (exclude would be useless
+    at the start as it only excludes from the stuff before it)"""
+    def __init__(self, *decls: AbstractInclude | AbstractExclude):
+        self.decls: list[AbstractInclude | AbstractExclude] = list(decls)
         self.stats = Stats()
         self.dirs: set[Path] = set()
         """^ WARNING: this won't add the contents/files in each of these,
         just the dirs themselves"""
         self.files: set[Path] = set()
-        # Consecutive blocks of includes/excludes
-        # Note: later overrides earlier
-        # Note: must start with an include block (an exclude would be useless at start)
-        # Note: source will be in format i0, e0, i1, e1, ..., in[, en]
-        self.include_blocks: list[list[...]] = []
-        self.exclude_blocks: list[list[...]] = []
 
     def list_files(self):
-        for i, includes in enumerate(self.include_blocks):  # For each include,
-            excludes = flatten(self.exclude_blocks[i:])  # Use the excludes below it
+        include_blocks, exclude_blocks = self._group_declarations()
+        for i, includes in enumerate(include_blocks):  # For each include,
+            excludes = flatten(exclude_blocks[i:])  # Use the excludes below it
             self._walk(includes, excludes)  # And add `includes - excludes_below_it`
+
+    _IEBlocksTup = tuple[list[list[AbstractInclude]], list[list[AbstractExclude]]]
+
+    def _group_declarations(self) -> _IEBlocksTup:
+        """Returns consecutive blocks of includes/excludes
+
+        Source will be: ``i0, e0, i1, e1, ..., in[, en]``
+        where each item can be 1+ decls.
+
+        This function parses the list of decls into
+        ``([i0, i1, ..., in], (e0, e1, ..., en])``"""
+        def group_key(v: AbstractInclude | AbstractExclude):
+            if isinstance(v, AbstractInclude): return 0
+            elif isinstance(v, AbstractExclude): return 1
+            assert 0, "only include and exclude declarations are allowed"
+
+        assert len(self.decls) > 0, "Expected some declarations"
+        assert isinstance(self.decls[0], AbstractInclude), (
+            "Include must come first (if exclude is first, "
+            "it would only apply to stuff before it (i.e. nothing))")
+        ie_blocks = [], []
+        for k, group in group_by(self.decls, key=group_key):
+            ie_blocks[k].append(list(group))
+        return ie_blocks
 
     def _walk(self, includes: Sequence[AbstractInclude],
               excludes: Sequence[AbstractExclude]):
