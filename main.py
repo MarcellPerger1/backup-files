@@ -42,17 +42,17 @@ class ExcludeDirMode(IntEnum):
         return self >= ExcludeDirMode.ALL
 
 
-class _IAnyExclude(ABC):
+class AbstractExclude(ABC):
     @abstractmethod
     def should_exclude(self, path: Path, /, fs_type: FsType) -> bool:
         return False
 
 
-class IFileExclude(_IAnyExclude, ABC):
+class AbstractFileExclude(AbstractExclude, ABC):
     """Exclude a file"""
 
 
-class IDirExclude(_IAnyExclude, ABC):
+class AbstractDirExclude(AbstractExclude, ABC):
     """Exclude dir itself (and contents)"""
 
     def __init__(self, keep_self: bool = False):
@@ -69,7 +69,7 @@ class IDirExclude(_IAnyExclude, ABC):
             return ExcludeDirMode.NO
 
 
-class FileExtExclude(IFileExclude):
+class FileExtExclude(AbstractFileExclude):
     def __init__(self, *ext: str):
         self.extensions = {e.removeprefix('.') for e in ext}
 
@@ -78,10 +78,10 @@ class FileExtExclude(IFileExclude):
         return ext in self.extensions
 
 
-class NameExclude(IFileExclude, IDirExclude):
+class NameExclude(AbstractFileExclude, AbstractDirExclude):
     def __init__(self, *names: str, fs_type: FsType | None = None,
                  keep_self: bool = False):
-        super().__init__(keep_self)
+        AbstractDirExclude.__init__(self, keep_self)
         self.names = set(names)
         self.fs_type = fs_type
 
@@ -91,7 +91,7 @@ class NameExclude(IFileExclude, IDirExclude):
         return path.name in self.names
 
 
-class _IAnyInclude(ABC):
+class AbstractInclude(ABC):
     # Quite a minimal API so implementors have to decide
     # how to go about finding the paths of interest
     @abstractmethod
@@ -99,11 +99,11 @@ class _IAnyInclude(ABC):
         return []
 
 
-class IFileInclude(_IAnyInclude, ABC):
+class AbstractFileInclude(AbstractInclude, ABC):
     """Include a file"""
 
 
-class IDirInclude(_IAnyInclude, ABC):
+class AbstractDirInclude(AbstractInclude, ABC):
     """Include a dir"""
 
 
@@ -168,7 +168,8 @@ class ListFiles:
             excludes = flatten(self.exclude_blocks[i:])  # Use the excludes below it
             self._walk(includes, excludes)  # And add `includes - excludes_below_it`
 
-    def _walk(self, includes: Sequence[_IAnyInclude], excludes: Sequence[_IAnyExclude]):
+    def _walk(self, includes: Sequence[AbstractInclude],
+              excludes: Sequence[AbstractExclude]):
         """Lists all files and dirs, adding ``includes - excludes`` to self"""
         roots = set()
         for o in includes:
@@ -180,7 +181,7 @@ class ListFiles:
                     roots.add(p)
         return self._walk_roots(roots, list(excludes))
 
-    def _walk_roots(self, roots: set[Path], excludes: list[_IAnyExclude]):
+    def _walk_roots(self, roots: set[Path], excludes: list[AbstractExclude]):
         visited_dirs: set[Path] = set()
         for root in roots:
             assert root.is_dir(), "Cannot have a non-dir root in _walk"
@@ -209,17 +210,17 @@ class ListFiles:
                 #  when os.walk() recursively goes into them (topdown)
 
     # noinspection PyMethodMayBeStatic
-    def should_exclude_file(self, excludes: list[_IAnyExclude], file: Path):
+    def should_exclude_file(self, excludes: list[AbstractExclude], file: Path):
         for e in excludes:
-            if isinstance(e, IFileExclude) and e.should_exclude(file, FsType.FILE):
+            if isinstance(e, AbstractFileExclude) and e.should_exclude(file, FsType.FILE):
                 return True
         return False
 
     # noinspection PyMethodMayBeStatic
-    def get_dir_exclude_mode(self, excludes: list[_IAnyExclude], path: Path):
+    def get_dir_exclude_mode(self, excludes: list[AbstractExclude], path: Path):
         result = ExcludeDirMode.NO
         for e in excludes:
-            if not isinstance(e, IDirExclude):
+            if not isinstance(e, AbstractDirExclude):
                 continue
             # Largest value (= largest amount excluded) wins
             result = max(result, e.exclude_mode_for(path, FsType.DIR))
