@@ -133,7 +133,8 @@ class Stats:
         self.bytes_to_copy_ls -= sizes[0]
         self.bytes_to_copy_du -= sizes[1]
 
-    def _calc_size(self, file: Path):
+    @classmethod
+    def _calc_size(cls, file: Path):
         return file.stat().st_size, shutil.disk_usage(file).used
 
     def add_file(self, file: Path):
