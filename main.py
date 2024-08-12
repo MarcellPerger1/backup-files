@@ -204,7 +204,7 @@ class ListFiles:
                 return result
         return result
 
-    def _walk(self, roots: set[Path], excludes: list[_IAnyExclude]):
+    def _walk_roots(self, roots: set[Path], excludes: list[_IAnyExclude]):
         visited_dirs: set[Path] = set()
         for root in roots:
             assert root.is_dir(), "Cannot have a non-dir root in _walk"
@@ -232,7 +232,7 @@ class ListFiles:
                 # Don't do anything with the dirs here, will handle them
                 #  when os.walk() recursively goes into them (topdown)
 
-    def walk(self, includes: Sequence[_IAnyInclude], excludes: Sequence[_IAnyExclude]):
+    def _walk(self, includes: Sequence[_IAnyInclude], excludes: Sequence[_IAnyExclude]):
         """Lists all files and dirs, adding ``includes - excludes`` to self"""
         roots = set()
         for o in includes:
@@ -242,12 +242,12 @@ class ListFiles:
                 else:
                     assert p.is_dir(), "Exotic structures (e.g. symlinks) aren't supported"
                     roots.add(p)
-        return self._walk(roots, list(excludes))
+        return self._walk_roots(roots, list(excludes))
 
     def list_files(self):
         for i, includes in enumerate(self.include_blocks):  # For each include,
             excludes = flatten(self.exclude_blocks[i:])  # Use the excludes below it
-            self.walk(includes, excludes)  # And add `includes - excludes_below_it`
+            self._walk(includes, excludes)  # And add `includes - excludes_below_it`
 
 
 class Backup:
