@@ -106,6 +106,14 @@ class AbstractDirInclude(AbstractInclude, ABC):
     """Include a dir"""
 
 
+class PathInclude(AbstractFileInclude, AbstractDirInclude):
+    def __init__(self, *paths: Path):
+        self.paths = paths
+
+    def get_paths(self) -> Sequence[Path]:
+        return self.paths
+
+
 class ListFiles:
     """NOTE: decls has later overrides earlier in all cases.
     It must also start with an include block (exclude would be useless
