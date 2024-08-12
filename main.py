@@ -169,7 +169,7 @@ def flatten(ls: Iterable[Iterable[T] | T]) -> list[T]:
     return [item for sub in ls for item in (sub if _is_actual_iterable(sub) else [sub])]
 
 
-class ListFilesV2:
+class ListFiles:
     def __init__(self):
         self.stats = Stats()
         self.dirs: set[Path] = set()
