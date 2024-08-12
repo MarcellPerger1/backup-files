@@ -69,21 +69,6 @@ class IDirExclude(_IAnyExclude, ABC):
             return ExcludeDirMode.NO
 
 
-class _IAnyInclude(ABC):
-    # TODO: better API for these
-    @abstractmethod
-    def get_paths(self) -> Sequence[Path]:
-        return []
-
-
-class IFileInclude(_IAnyInclude, ABC):
-    """Include a file"""
-
-
-class IDirInclude(_IAnyInclude, ABC):
-    """Include a dir"""
-
-
 class FileExtExclude(IFileExclude):
     def __init__(self, *ext: str):
         self.extensions = {e.removeprefix('.') for e in ext}
@@ -104,6 +89,21 @@ class NameExclude(IFileExclude, IDirExclude):
         if self.fs_type is not None and not self.fs_type.matches_path(path):
             return False
         return path.name in self.names
+
+
+class _IAnyInclude(ABC):
+    # TODO: better API for these
+    @abstractmethod
+    def get_paths(self) -> Sequence[Path]:
+        return []
+
+
+class IFileInclude(_IAnyInclude, ABC):
+    """Include a file"""
+
+
+class IDirInclude(_IAnyInclude, ABC):
+    """Include a dir"""
 
 
 class Stats:
@@ -145,54 +145,6 @@ class Stats:
 
     def add_dir(self, _path: Path):
         self.n_dirs += 1
-
-
-class ListPaths:
-    def __init__(self):
-        self.stats = Stats()
-        self.file_excludes: list[IFileExclude] = []
-        self.dir_excludes: list[IDirExclude] = []
-        self.files_to_copy: set[Path] = set()
-
-    def should_exclude_file(self, file: Path):
-        for e in self.file_excludes:  # Somehow, this is the fastest approach
-            if e.should_exclude(file, FsType.FILE):
-                return True
-        return False
-
-    def add_file(self, file: Path):
-        self.stats.add_file(file)
-        self.files_to_copy.add(file)
-
-    def remove_file(self, file: Path):
-        if file not in self.files_to_copy:
-            return
-        self.stats.remove_file(file)
-        self.files_to_copy.remove(file)
-
-    def include_file(self, file: Path):
-        self.add_file(file)  # Simple case
-
-    def exclude_file(self, file: Path):
-        self.remove_file(file)
-
-
-
-    def walk_user(self):
-        # TODO: from start: block of include -> block of exclude -> repeat
-        #  SpecificDirInclude adds a 'root' to search here recursively
-        for parent_s, dirs, files in os.walk(os.path.expanduser('~/')):
-            parent = Path(parent_s)
-            for file in files:
-                assert os.path.isfile(file), "Found exotic structure (e.g. junction/symlink)"
-                if not self.should_exclude_file(filepath := parent/file):
-                    self.add_file(filepath)
-            # TODO: handle dirs
-            for d in dirs:
-                ...
-
-
-            ...
 
 
 # Note: this must be TypeGuard NOT TypeIs because
