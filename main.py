@@ -15,7 +15,7 @@ from py_util import flatten
 class FsType(StrEnum):
     FILE = 'file'
     DIR = 'dir'
-    OTHER = 'other'  # TODO: links?
+    OTHER = 'other'  # TODO: symlinks?
 
     @classmethod
     def from_path(cls, path: Path):
@@ -92,7 +92,8 @@ class NameExclude(IFileExclude, IDirExclude):
 
 
 class _IAnyInclude(ABC):
-    # TODO: better API for these
+    # Quite a minimal API so implementors have to decide
+    # how to go about finding the paths of interest
     @abstractmethod
     def get_paths(self) -> Sequence[Path]:
         return []
@@ -175,7 +176,7 @@ class ListFiles:
         self.dirs.add(path)
 
     def remove_file(self, file: Path):
-        # TODO: don't use internally - should not have been added
+        # Note: don't use internally - should not have been added
         #  in the first place (excludes are applied during each 'include walk')
         if file not in self.files:
             return
@@ -251,9 +252,3 @@ class ListFiles:
 class Backup:
     def __init__(self):
         ...
-
-
-def main():
-    assert Path('~/').expanduser() == Path(r'C:/Users/marce/')
-
-
