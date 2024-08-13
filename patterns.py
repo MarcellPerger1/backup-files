@@ -63,23 +63,26 @@ class AbstractPattern(ABC):
             return FsTypeFlag.DIR  # must be dir if it has children
         return FsTypeFlag.BOTH
 
-    def list_files(self, root: Path = None):
-        if root is None:
-            return self.list_files_from_root()
+    def list_files(self, root: Path = None) -> list[Path]:
         return self.list_subpaths_matching(root)
 
-    def list_files_from_root(self):
-        raise TypeError("list_files_from_root must only be called on a root pattern")
-
-    def list_subpaths_matching(self, parent: Path):
+    def list_subpaths_matching(self, parent: Path | None) -> list[Path]:
         """List all subpaths of ``parent`` matching ``self``.
 
         Here, parent is the directory above this and ``parent.iterdir()``
         gives the candidates for ``self`` to match."""
         return self._filter_paths_matching_subpatterns(
-            self.list_subpaths_matching_self(parent))
+            self.list_subpaths_matching_self_or_root(parent))
 
-    def list_subpaths_matching_self(self, parent: Path):
+    def list_subpaths_matching_self_or_root(self, parent: Path | None) -> list[Path]:
+        if parent is None:
+            return self.list_files_from_root()
+        return self.list_subpaths_matching_self(parent)
+
+    def list_files_from_root(self) -> list[Path]:
+        raise TypeError("list_files_from_root must only be called on a root pattern")
+
+    def list_subpaths_matching_self(self, parent: Path) -> list[Path]:
         """List all subpaths of ``parent`` matching ``self``,
         not taking into account subpatterns/children.
 
@@ -94,20 +97,24 @@ class AbstractPattern(ABC):
                 and self.matches_self(p.relative_to(parent), full_path=p)]
 
     def _filter_paths_matching_subpatterns(self, paths: list[Path]) -> list[Path]:
-        return [p for p in paths if self._subpatterns_match(p.relative_to(p.parent), p)]
+        return [p for p in paths
+                # Check again (list_subpaths_matching_self may have been overridden)
+                if self.fs_type & FsTypeFlag.from_path(p)
+                # TODO no no NO! this is meant to somehow call subpatterns.list_files
+                and self._subpatterns_match(p.relative_to(p.parent), p)]
 
     def match(self, p: Path):
         assert p.is_absolute()
         return self.matches_subpath(p, p)
 
-    def matches_subpath(self, path: PurePath, full_path: Path):
+    def matches_subpath(self, path: PurePath, full_path: Path) -> bool:
         # Wow, this is so readable!
         return (self._is_valid_for_current_type(path, full_path)
                 and self.matches_self(path, full_path)
                 and self._subpatterns_match(path, full_path))
 
     @abstractmethod
-    def matches_self(self, path: PurePath, full_path: Path):
+    def matches_self(self, path: PurePath, full_path: Path) -> bool:
         ...
 
     def _is_valid_for_current_type(self, path: PurePath, full_path: Path):
@@ -164,10 +171,36 @@ class SingleNamePattern(AbstractPattern):
     def __init__(self, name: str,
                  fs_type: FsTypeFlag = None,
                  children: Sequence[AbstractPattern] = ()):
-        self.name = name
         if fs_type is None and name.endswith('/'):
             fs_type = FsTypeFlag.DIR
+            name = name.removesuffix('/')
+        self.name = name
         super().__init__(fs_type, children)
 
-    def matches_self(self, path: PurePath, full_path: Path):
+    def matches_self(self, path: PurePath, full_path: Path) -> bool:
         return self.current_component(path) == self.name
+
+    def list_subpaths_matching_self(self, parent: Path) -> list[Path]:
+        sub = parent / self.name
+        return [sub] if sub.exists() and self.fs_type & FsTypeFlag.from_path(sub) else []
+
+
+class RootPattern(AbstractPattern):
+    """A root pattern (windows drive letter or '/' on Posix).
+    Maybe could also represent some UNC path stuff
+    but that isn't supported (yet???)."""
+    def __init__(self, path: str | Path, children: Sequence[AbstractPattern]):
+        path = Path(path)
+        assert path.is_dir()
+        assert path.is_absolute()
+        assert len(path.parts) == 0
+        self.root = path
+        self.root_str = self.root.as_posix()
+        super().__init__(FsTypeFlag.DIR, children)
+
+    def matches_self(self, path: PurePath, full_path: Path) -> bool:
+        assert path == full_path, "RootPattern must be at the bottom of the pattern tree."
+        return self.current_component(path) == self.root_str
+
+    def list_files_from_root(self) -> list[Path]:
+        return list(self.root.iterdir())
