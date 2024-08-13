@@ -46,15 +46,22 @@ class AbstractPattern(ABC):
      - (**Required**) TODO something to do with listing files
     """
 
-    def __init__(self, fs_type: FsTypeFlag = FsTypeFlag.BOTH,
+    def __init__(self, fs_type: FsTypeFlag = None,
                  children: Sequence[AbstractPattern] = ()):
         # TODO: if perf of this bad, use a bit of caching of upper levels results
         #  as when checking many deep paths, the first few parts will be
         #  the same but will need to be checked a TON
-        self.fs_type = fs_type
         self.children = children
-        if self.fs_type == FsTypeFlag.FILE:
-            assert len(self.children) == 0, "Cannot have children in a file-only pattern"
+        self.fs_type = self._get_fs_type(fs_type)
+
+    def _get_fs_type(self, fs_type: FsTypeFlag = None):
+        if fs_type is not None:
+            if fs_type == FsTypeFlag.FILE:
+                assert len(self.children) == 0, "Cannot have children in a file-only pattern"
+            return fs_type
+        if len(self.children) > 0:
+            return FsTypeFlag.DIR  # must be dir if it has children
+        return FsTypeFlag.BOTH
 
     def match(self, p: Path):
         return self.matches_subpath(p, p)
@@ -118,21 +125,9 @@ class AbstractPattern(ABC):
 
 
 class NamePattern(AbstractPattern):
+    # TODO: if ends in `/`?
     def __init__(self, name: str | Sequence[str],
-                 fs_type: FsTypeFlag = FsTypeFlag.BOTH,
-                 children: Sequence[AbstractPattern] = ()):
-        if isinstance(name, str):
-            name = [name]
-        self.names = set(name)
-        super().__init__(fs_type, children)
-
-    def matches_self(self, path: PurePath, full_path: Path):
-        return self.current_component(path) in self.names
-
-
-class FnMatchPattern(AbstractPattern):
-    def __init__(self, name: str | Sequence[str],
-                 fs_type: FsTypeFlag = FsTypeFlag.BOTH,
+                 fs_type: FsTypeFlag = None,
                  children: Sequence[AbstractPattern] = ()):
         if isinstance(name, str):
             name = [name]
