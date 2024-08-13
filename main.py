@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import os
 import os.path
 from abc import ABC, abstractmethod
@@ -245,6 +246,11 @@ class ListFiles:
         """Assert that path is a regular file or a directory"""
         assert path.is_file() or path.is_dir(), (
             "Exotic structures (e.g. symlinks) are not currently supported")
+
+# TODO: for intra-file progress bar (Windows API):
+#  https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-copyfile2,
+#  https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-copyfileexa
+#  https://learn.microsoft.com/en-us/windows/win32/api/winbase/nc-winbase-lpprogress_routine
 
 
 class Backup:

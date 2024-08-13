@@ -63,7 +63,35 @@ class AbstractPattern(ABC):
             return FsTypeFlag.DIR  # must be dir if it has children
         return FsTypeFlag.BOTH
 
+    def list_subpaths_matching_self(self, parent: Path):
+        """List all subpaths of ``parent`` matching ``self``,
+        not taking into account subpatterns/children.
+
+        This default implementation is inefficient,
+        listing all the files in the dir and checking if they match.
+        Implementors should provide a more efficient implementation if possible.
+
+        Here, parent is the directory above this and ``parent.iterdir()``
+        gives the candidates for ``self`` to match."""
+        return [p for p in parent.iterdir()
+                if self.fs_type & FsTypeFlag.from_path(p)
+                and self.matches_self(p.relative_to(parent), full_path=p)]
+    # TODO: code of filter this list ^^^ based on subclasses
+    #  and then method to combine everything
+
+    def _filter_paths_matching_subpatterns(self, paths: list[Path]) -> list[Path]:
+        return [p for p in paths if self._subpatterns_match(p.relative_to(p.parent), p)]
+
+    def list_subpaths_matching(self, parent: Path):
+        """List all subpaths of ``parent`` matching ``self``.
+
+        Here, parent is the directory above this and ``parent.iterdir()``
+        gives the candidates for ``self`` to match."""
+        return self._filter_paths_matching_subpatterns(
+            self.list_subpaths_matching_self(parent))
+
     def match(self, p: Path):
+        assert p.is_absolute()
         return self.matches_subpath(p, p)
 
     def matches_subpath(self, path: PurePath, full_path: Path):
