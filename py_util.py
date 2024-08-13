@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import itertools
+from pathlib import Path, PurePath
 from typing import TypeVar, TypeGuard, Iterable, Callable, Iterator
 
 T = TypeVar('T')
 KT = TypeVar('KT')
+PT = TypeVar('PT', bound=PurePath)
 
 
 # Note: this must be TypeGuard NOT TypeIs because
@@ -34,3 +36,16 @@ def flatten(ls: Iterable[Iterable[T] | T]) -> list[T]:
 def group_by(it: Iterable[T], key: Callable[[T], KT]) -> Iterator[tuple[KT, Iterator[T]]]:
     """Same as itertools.groupby but with types that Pycharm recognizes"""
     return itertools.groupby(it, key=key)
+
+
+def assert_not_exotic(p: Path):
+    """Assert that ``p`` is a regular file or directory."""
+    assert p.is_file() or p.is_dir(), "Must not be an exotic fs object (e.g. symlink)"
+
+
+def get_path_root_and_drv(p: PT) -> PT:
+    return Path(p).parents[-1]
+
+
+def get_path_without_anchor(p: PT) -> PT:
+    return p.relative_to(get_path_root_and_drv(p))
