@@ -87,6 +87,8 @@ class AbstractPattern(ABC):
             else self._subpatterns_match_path(path, full_patch))
 
     def _subpatterns_match_path(self, path, full_path):
+        if not self.children:
+            return True
         subpath = self.get_subpath(path)
         for ch in self.children:
             if ch.matches_subpath(subpath, full_path):
@@ -124,15 +126,14 @@ class AbstractPattern(ABC):
         return path.parts[0].replace('\\', '/')
 
 
-class NamePattern(AbstractPattern):
-    # TODO: if ends in `/`?
-    def __init__(self, name: str | Sequence[str],
+class SingleNamePattern(AbstractPattern):
+    def __init__(self, name: str,
                  fs_type: FsTypeFlag = None,
                  children: Sequence[AbstractPattern] = ()):
-        if isinstance(name, str):
-            name = [name]
-        self.names = set(name)
+        self.name = name
+        if fs_type is None and name.endswith('/'):
+            fs_type = FsTypeFlag.DIR
         super().__init__(fs_type, children)
 
     def matches_self(self, path: PurePath, full_path: Path):
-        return self.current_component(path) in self.names
+        return self.current_component(path) == self.name
