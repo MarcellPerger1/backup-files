@@ -31,19 +31,24 @@ class AbstractPattern(ABC):
 
     API for users:
      - ``match`` returns a ``bool`` indicating whether ``self`` matches a path
-     - TODO: ``list_files`` returns a list/iterable of all the files matching ``self``
+     - ``list_files`` returns a list of all the files matching ``self``
      - ``__init__`` of subclasses to instantiate these patterns
 
     API for implementors:
      - (**Required**) ``matches_self`` - returns True if a path matches
        ``self``, not taking into account the children
-     - (Optional) ``matches_null`` - whether it matches an final null segment.
+     - (Optional) ``matches_null`` - whether it matches a final null segment.
        Default: return ``False``
      - (Optional) ``get_subpath`` returns path to match children against
      - (Optional) ``is_final_component``
      - (Optional) ``current_component`` returns current segment of path
        being matched against in ``self`` (for use by implementors)
-     - (**Required**) TODO something to do with listing files
+     - (Optional, but **recommended**) ``list_subpaths_matching_self`` returns
+       a list of subdirectories of ``parent`` matching ``self``, not taking
+       into account the children
+     - (**Required for root patterns**) ``list_files_from_root`` list
+       all paths matching ``self``, not taking children into account
+     - (Optional, maybe don't override) ``has_allowed_fs_type``
     """
 
     def __init__(self, fs_type: FsTypeFlag = None,
@@ -97,7 +102,7 @@ class AbstractPattern(ABC):
         Here, parent is the directory above this and ``parent.iterdir()``
         gives the candidates for ``self`` to match."""
         return [p for p in parent.iterdir()
-                if self._has_allowed_fs_type(p)
+                if self.has_allowed_fs_type(p)
                 and self.matches_self(p.relative_to(parent), full_path=p)]
 
     def _find_all_subpaths_from_subpatterns(  # This name is so long!
@@ -113,7 +118,7 @@ class AbstractPattern(ABC):
         return flatten(sub.list_subpaths_matching(parent=p) for sub in self.children)
 
     def _filter_allowed_fs_types(self, paths: list[Path]) -> list[Path]:
-        return [p for p in paths if self._has_allowed_fs_type(p)]
+        return [p for p in paths if self.has_allowed_fs_type(p)]
     # endregion
 
     # region match() et al.
@@ -151,7 +156,7 @@ class AbstractPattern(ABC):
         return False
 
     def _subpatterns_match_final(self, _path: PurePath, full_path: Path):
-        return (self._has_allowed_fs_type(full_path)
+        return (self.has_allowed_fs_type(full_path)
                 and (len(self.children) == 0
                      or self._any_child_matches_null()))
 
@@ -163,7 +168,7 @@ class AbstractPattern(ABC):
     # endregion
 
     # region (overridable) one-liner utils for more readable code
-    def _has_allowed_fs_type(self, p: Path):
+    def has_allowed_fs_type(self, p: Path):
         return self.fs_type & FsTypeFlag.from_path(p)
 
     # Not static so that is can be overridden by 'shortcut' matchers
