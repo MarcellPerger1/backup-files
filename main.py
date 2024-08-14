@@ -7,6 +7,7 @@ from enum import StrEnum, IntEnum
 from pathlib import Path
 from typing import Sequence
 
+from patterns import AbstractPattern
 from py_util import flatten, group_by
 from stats import Stats
 
@@ -90,6 +91,20 @@ class NameExclude(AbstractFileExclude, AbstractDirExclude):
         return path.name in self.names
 
 
+class PatternExclude(AbstractFileExclude, AbstractDirExclude):
+    def __init__(self, pat: AbstractPattern):
+        # Don't keep self:
+        #  - If a dir pattern has no children it will match the dir and
+        #    everything below so deletes everything (e.g. a/dir/ in gitignore)
+        #  - If a dir pattern has a single `*` child (= match everything),
+        #    it will leave the dir and will remove everything below
+        AbstractDirExclude.__init__(self, keep_self=False)
+        self.pat = pat
+
+    def should_exclude(self, path: Path, /, fs_type: FsType) -> bool:
+        return self.pat.match(path)
+
+
 class AbstractInclude(ABC):
     # Quite a minimal API so implementors have to decide
     # how to go about finding the paths of interest
@@ -112,6 +127,14 @@ class PathInclude(AbstractFileInclude, AbstractDirInclude):
 
     def get_paths(self) -> Sequence[Path]:
         return self.paths
+
+
+class PatternInclude(AbstractFileInclude, AbstractDirInclude):
+    def __init__(self, pat: AbstractPattern):
+        self.pat = pat
+
+    def get_paths(self) -> Sequence[Path]:
+        return self.pat.list_files()  # And hope it's a root pattern
 
 
 class ListFiles:
