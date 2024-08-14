@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from enum import Flag
 from pathlib import Path, PurePath
 
-from py_util import assert_not_exotic
+from py_util import assert_not_exotic, flatten
 
 
 class FsTypeFlag(Flag):
@@ -63,6 +63,7 @@ class AbstractPattern(ABC):
             return FsTypeFlag.DIR  # must be dir if it has children
         return FsTypeFlag.BOTH
 
+    # region list_files() et al.
     def list_files(self, root: Path = None) -> list[Path]:
         return self.list_subpaths_matching(root)
 
@@ -71,8 +72,11 @@ class AbstractPattern(ABC):
 
         Here, parent is the directory above this and ``parent.iterdir()``
         gives the candidates for ``self`` to match."""
-        return self._filter_paths_matching_subpatterns(
-            self.list_subpaths_matching_self_or_root(parent))
+        return self._find_all_subpaths_from_subpatterns(
+            self._filter_allowed_fs_types(
+                self.list_subpaths_matching_self_or_root(parent)
+            )
+        )
 
     def list_subpaths_matching_self_or_root(self, parent: Path | None) -> list[Path]:
         if parent is None:
@@ -93,16 +97,26 @@ class AbstractPattern(ABC):
         Here, parent is the directory above this and ``parent.iterdir()``
         gives the candidates for ``self`` to match."""
         return [p for p in parent.iterdir()
-                if self.fs_type & FsTypeFlag.from_path(p)
+                if self._has_allowed_fs_type(p)
                 and self.matches_self(p.relative_to(parent), full_path=p)]
 
-    def _filter_paths_matching_subpatterns(self, paths: list[Path]) -> list[Path]:
-        return [p for p in paths
-                # Check again (list_subpaths_matching_self may have been overridden)
-                if self.fs_type & FsTypeFlag.from_path(p)
-                # TODO no no NO! this is meant to somehow call subpatterns.list_files
-                and self._subpatterns_match(p.relative_to(p.parent), p)]
+    def _find_all_subpaths_from_subpatterns(  # This name is so long!
+            self, paths_matching_self: list[Path]) -> list[Path]:
+        return flatten([self._find_subpaths_of_from_subpatterns(p)
+                        for p in paths_matching_self])
 
+    def _find_subpaths_of_from_subpatterns(self, p: Path) -> list[Path]:
+        if not self.children:
+            return [p]
+        if p.is_file():
+            return [p] if self._subpatterns_match_final(p, p) else []
+        return flatten(sub.list_subpaths_matching(parent=p) for sub in self.children)
+
+    def _filter_allowed_fs_types(self, paths: list[Path]) -> list[Path]:
+        return [p for p in paths if self._has_allowed_fs_type(p)]
+    # endregion
+
+    # region match() et al.
     def match(self, p: Path):
         assert p.is_absolute()
         return self.matches_subpath(p, p)
@@ -137,15 +151,20 @@ class AbstractPattern(ABC):
         return False
 
     def _subpatterns_match_final(self, _path: PurePath, full_path: Path):
-        actual_type_flag = FsTypeFlag.from_path(full_path)
-        if not self.fs_type & actual_type_flag:
-            return False
-        if not self.children:
-            return True
+        return (self._has_allowed_fs_type(full_path)
+                and (len(self.children) == 0
+                     or self._any_child_matches_null()))
+
+    def _any_child_matches_null(self):
         for ch in self.children:
             if ch.matches_null():
                 return True
         return False
+    # endregion
+
+    # region (overridable) one-liner utils for more readable code
+    def _has_allowed_fs_type(self, p: Path):
+        return self.fs_type & FsTypeFlag.from_path(p)
 
     # Not static so that is can be overridden by 'shortcut' matchers
     #  (i.e. matchers matching multiple levels)
@@ -165,6 +184,7 @@ class AbstractPattern(ABC):
     # noinspection PyMethodMayBeStatic
     def current_component(self, path: PurePath):
         return path.parts[0].replace('\\', '/')
+    # endregion
 
 
 class SingleNamePattern(AbstractPattern):
