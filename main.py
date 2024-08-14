@@ -8,14 +8,14 @@ from pathlib import Path
 from typing import Sequence
 
 from patterns import AbstractPattern
-from py_util import flatten, group_by
+from py_util import flatten, group_by, assert_not_exotic
 from stats import Stats
 
 
 class FsType(StrEnum):
     FILE = 'file'
     DIR = 'dir'
-    OTHER = 'other'  # TODO: symlinks?
+    # TODO: symlinks/exotic stuff
 
     @classmethod
     def from_path(cls, path: Path):
@@ -23,7 +23,7 @@ class FsType(StrEnum):
             return cls.FILE
         if path.is_dir():
             return cls.DIR
-        return cls.OTHER
+        assert_not_exotic(path)
 
     def matches_path(self, path: Path):
         return self == FsType.from_path(path)
