@@ -67,6 +67,7 @@ class AbstractDirExclude(AbstractExclude, ABC):
         assert fs_type == FsType.DIR
         if not self.should_exclude(path, fs_type):
             return ExcludeDirMode.NO
+        return ExcludeDirMode.CONTENTS if self.should_keep_self() else ExcludeDirMode.ALL
 
 
 class FileExtExclude(AbstractFileExclude):
