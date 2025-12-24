@@ -4,6 +4,8 @@ import shutil
 import warnings
 from pathlib import Path
 
+from py_util import get_size_on_disk
+
 
 class Stats:
     def __init__(self):
@@ -18,8 +20,8 @@ class Stats:
         try:
             result = self._size_cache[file]
         except KeyError:
-            warnings.warn("File not found in cache - this will give "
-                          "wrong results if file is changed")
+            # warnings.warn("File not found in cache - this will give "
+            #               "wrong results if file is changed")
             result = self._size_cache[file] = self._calc_size(file)
         return result
 
@@ -33,7 +35,8 @@ class Stats:
 
     @classmethod
     def _calc_size(cls, file: Path):
-        return file.stat().st_size, shutil.disk_usage(file).used
+        st = file.stat()
+        return st.st_size, get_size_on_disk(file, st)
 
     def add_file(self, file: Path):
         self.n_files += 1

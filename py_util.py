@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import itertools
+import math
+import os
+import sys
+from idlelib.debugobj import AtomicObjectTreeItem
 from pathlib import Path, PurePath
 from typing import TypeVar, TypeGuard, Iterable, Callable, Iterator
 
@@ -50,3 +54,24 @@ def get_path_root_and_drv(p: PT) -> PT:
 
 def get_path_without_anchor(p: PT) -> PT:
     return p.relative_to(get_path_root_and_drv(p))
+
+
+def get_size_on_disk(p: Path, st: os.stat_result | None = None):
+    st = st or p.stat()
+    if HAS_ST_STAT:
+        try:
+            return st.st_blocks * 512
+        except AttributeError:
+            pass
+    size = st.st_size
+    if sys.platform == 'win32':  # Good-enough check for NTFS
+        # NTFS: File data is stored in rest of the 1KiB block if it fits
+        # File name and other stuff also takes up space there.
+        # Empirically, it fits in the file table entry if
+        # size < 731 - path length
+        if size < 720 - len(str(p)):  # Go with 720 as there may be extra metadata
+            return 0
+    return math.ceil(size / 4096) * 4096
+
+
+HAS_ST_STAT = hasattr(os.stat_result, 'st_blocks')
