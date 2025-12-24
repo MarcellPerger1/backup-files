@@ -11,7 +11,8 @@ from py_util import assert_not_exotic, flatten
 class FsTypeFlag(Flag):
     FILE = 1
     DIR = 2
-    BOTH = FILE | DIR
+    # noinspection PyTypeChecker
+    BOTH = FILE | DIR  # ^^^ Pycharm's typechecker is stupid
 
     @classmethod
     def from_path(cls, p: Path):
@@ -19,7 +20,7 @@ class FsTypeFlag(Flag):
             return cls.FILE
         if p.is_dir():
             return cls.DIR
-        assert_not_exotic(p)
+        raise assert_not_exotic(p)
 
 
 FILE = FsTypeFlag.FILE
@@ -139,10 +140,10 @@ class AbstractPattern(ABC):
     def _is_valid_for_current_type(self, path: PurePath, full_path: Path):
         actual_type_flag = (FsTypeFlag.DIR if not self.is_final_component(path)
                             else FsTypeFlag.from_path(full_path))
-        return self.fs_type & actual_type_flag
+        return bool(self.fs_type & actual_type_flag)
 
     def _subpatterns_match(self, path: PurePath, full_patch: Path):
-        return (
+        return bool(
             self._subpatterns_match_final(path, full_patch) if self.is_final_component(path)
             else self._subpatterns_match_path(path, full_patch))
 
@@ -218,6 +219,8 @@ class RootPattern(AbstractPattern):
         path = Path(path)
         assert path.is_dir()
         assert path.is_absolute()
+        # TODO? Why are we forcing users to start at the root dir?
+        #  Does this check even work properly??
         assert len(path.parts) == 0
         self.root = path
         self.root_str = self.root.as_posix()

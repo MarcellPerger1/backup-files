@@ -41,6 +41,7 @@ def group_by(it: Iterable[T], key: Callable[[T], KT]) -> Iterator[tuple[KT, Iter
 def assert_not_exotic(p: Path):
     """Assert that ``p`` is a regular file or directory."""
     assert p.is_file() or p.is_dir(), "Must not be an exotic fs object (e.g. symlink)"
+    return AssertionError("Must not be an exotic fs object (e.g. symlink)")
 
 
 def get_path_root_and_drv(p: PT) -> PT:
