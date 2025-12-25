@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import fnmatch
-import glob
 import os
 import os.path
 import re
