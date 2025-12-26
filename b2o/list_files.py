@@ -10,6 +10,8 @@ from .stats import Stats
 from .common import ExcludeMode, Clusivity, FsType
 from .rule import AbstractInclusionRule, AbstractInclude, AbstractExclude
 
+_IEBlocksTup = tuple[list[list[AbstractInclude]], list[list[AbstractExclude]]]
+
 
 class ListFiles:
     """NOTE: decls has later overrides earlier in all cases.
@@ -29,8 +31,6 @@ class ListFiles:
             excludes = flatten(exclude_blocks[i:])  # Use the excludes below it
             self._walk(includes, excludes)  # And add `includes - excludes_below_it`
 
-    _IEBlocksTup = tuple[list[list[AbstractInclude]], list[list[AbstractExclude]]]
-
     def _group_declarations(self) -> _IEBlocksTup:
         """Returns consecutive blocks of includes/excludes
 
@@ -43,7 +43,7 @@ class ListFiles:
         assert self.decls[0].get_clusivity() == Clusivity.INCLUDE, (
             "Include must come first (if exclude is first, "
             "it would only apply to stuff before it (i.e. nothing))")
-        ie_blocks = [], []
+        ie_blocks: _IEBlocksTup = [], []
         k: Clusivity
         for k, group in group_by(self.decls, key=lambda r: r.get_clusivity()):
             ie_blocks[k].append(list(group))
