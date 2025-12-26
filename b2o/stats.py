@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import shutil
-import warnings
 from pathlib import Path
 
-from py_util import get_size_on_disk
+from .py_util import get_size_on_disk
 
 
 class Stats:

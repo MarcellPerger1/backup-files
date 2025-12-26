@@ -6,7 +6,6 @@ import itertools
 import math
 import os
 import sys
-from idlelib.debugobj import AtomicObjectTreeItem
 from pathlib import Path, PurePath
 from typing import TypeVar, TypeGuard, Iterable, Callable, Iterator
 

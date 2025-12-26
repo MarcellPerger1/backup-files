@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from enum import Flag
 from pathlib import Path, PurePath
 
-from py_util import assert_not_exotic, flatten
+from b2o.py_util import assert_not_exotic, flatten
 
 
 class FsTypeFlag(Flag):
