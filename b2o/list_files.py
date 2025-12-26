@@ -5,9 +5,9 @@ import os.path
 from pathlib import Path
 from typing import Sequence
 
-from .py_util import flatten, group_by
+from .py_util import flatten, group_by, assert_not_exotic
 from .stats import Stats
-from .common import ExcludeMode as ExcludeDirMode, Clusivity
+from .common import ExcludeMode, Clusivity, FsType
 from .rule import AbstractInclusionRule, AbstractInclude, AbstractExclude
 
 
@@ -56,7 +56,7 @@ class ListFiles:
         roots = set()
         for o in includes:
             for p in o.list_paths():
-                self._assert_not_exotic(p)
+                assert_not_exotic(p)
                 if p.is_file():
                     self._add_file_with_excludes(excludes, p)
                 else:
@@ -68,46 +68,39 @@ class ListFiles:
         for root in roots:
             assert root.is_dir(), "Cannot have a non-dir root in _walk"
             for dir_str, dirs, files in os.walk(root.expanduser().resolve()):
-                dirpath = Path(dir_str).resolve()
-                if dirpath in visited_dirs:
-                    # Already visited this tree, don't visit children
-                    dirs.clear()
+                if (dirpath := Path(dir_str).resolve()) in visited_dirs:
+                    dirs.clear()  # Already visited this tree, don't visit children
                     continue
                 visited_dirs.add(dirpath)
+                self._visit_dir(dirpath, dirs, files, excludes)
 
-                excl_mode = self.get_dir_exclude_mode(excludes, dirpath)
-                if not excl_mode.exclude_self():
-                    self.add_dir_only(dirpath)
-                if excl_mode.exclude_contents():
-                    dirs.clear()  # Don't recurse into dirs
-                    continue  # Don't add content (skip the code below)
-
-                for file in files:
-                    self._add_file_with_excludes(excludes, dirpath / file)
-                # Don't do anything with the dirs here, will handle them
-                #  when os.walk() recursively goes into them (topdown)
+    def _visit_dir(self, dirpath: Path, dirnames: list[str], filenames: list[str],
+                   excludes: list[AbstractExclude]):
+        excl_mode = self.get_exclude_mode(excludes, dirpath, FsType.DIR)
+        if excl_mode.exclude_contents():
+            dirnames.clear()  # Don't recurse into dirs
+            filenames.clear()  # Don't add files
+        if excl_mode.exclude_self():
+            return  # Don't add self (skip the code below)
+        self.add_dir_only(dirpath)
+        for file in filenames:
+            self._add_file_with_excludes(excludes, dirpath / file)
+        # Don't do anything with the dirs here, will handle them
+        #  when os.walk() recursively goes into them (topdown)
 
     def _add_file_with_excludes(self, excludes: list[AbstractExclude], file: Path):
         assert file.is_file(), "Expected a file, not dir/exotic"
-        if not self.should_exclude_file(excludes, file):
+        if not self.get_exclude_mode(excludes, file, FsType.FILE):
             self.add_file(file)
 
     # noinspection PyMethodMayBeStatic
-    def should_exclude_file(self, excludes: list[AbstractExclude], file: Path):
-        for e in excludes:
-            if e.should_exclude(file):
-                return True
-        return False
-
-    # noinspection PyMethodMayBeStatic
-    def get_dir_exclude_mode(self, excludes: list[AbstractExclude], path: Path):
-        result = ExcludeDirMode.NO
+    def get_exclude_mode(self, excludes: list[AbstractExclude], path: Path, fs_type: FsType):
+        result = ExcludeMode.NO
         for e in excludes:
             # Largest value (= largest amount excluded) wins
             result = max(result, e.exclude_mode_for(path))
-            if result == ExcludeDirMode.ALL:
-                # Excluding everything already, no need to go further
-                return result
+            if result.is_completely_excluded(fs_type):
+                return ExcludeMode.ALL
         return result
 
     def add_file(self, file: Path):
@@ -130,12 +123,6 @@ class ListFiles:
             return
         self.stats.remove_file(file)
         self.files.remove(file)
-
-    @staticmethod
-    def _assert_not_exotic(path: Path):
-        """Assert that path is a regular file or a directory"""
-        assert path.is_file() or path.is_dir(), (
-            "Exotic structures (e.g. symlinks) are not currently supported")
 
 # TODO: for intra-file progress bar (Windows API):
 #  https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-copyfile2,

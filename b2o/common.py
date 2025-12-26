@@ -39,3 +39,7 @@ class ExcludeMode(IntEnum):
 
     def exclude_self(self):
         return self >= ExcludeMode.ALL
+
+    def is_completely_excluded(self, fs_type: FsType):
+        return (self == ExcludeMode.ALL or
+                (fs_type == FsType.FILE and self == ExcludeMode.CONTENTS))
