@@ -22,6 +22,7 @@ class BackupExecutor:
         self.lister.list_files()
         # Strategy: Add all the files, then add the empty dirs that haven't
         # been added along with them (as they contained no files)
+        self.dest.mkdir(exist_ok=True)
         self._dirs_remaining = set(self.lister.dirs)
         for f in self.lister.files:
             self.add_file(f)  # TODO Parallel?
@@ -30,23 +31,29 @@ class BackupExecutor:
 
     def add_file(self, srcfile: Path):
         destfile = self.get_dest_path(srcfile)
-        self._create_dir(destfile.parent)
+        self.add_dir(srcfile.parent)  # Will always map to destfile.parent
         shutil.copy2(srcfile, destfile)
 
-    def add_dir(self, srcdir: Path):
+    def add_dir(self, srcdir: Path, remove_from_remaining: bool = True):
         destdir = self.get_dest_path(srcdir)
-        self._create_dir(destdir)
+        self._copy_dir(destdir, srcdir, remove_from_remaining)
+
+    def _copy_dir(self, destdir: Path, srcdir: Path = None,
+                  remove_from_remaining: bool = True):
+        if not self._dir_exists(destdir):
+            self._copy_dir(destdir.parent, srcdir.parent, remove_from_remaining)
+            destdir.mkdir()
+            # If we don't need to copy it, just make the dir, don't copy stat
+            # (the source might not be somewhere sane, the dir is just there
+            # for infrastructure purposes, not because it needs to vbe copied)
+            if srcdir and (srcdir in self._dirs_remaining or srcdir in self._dirs_added):
+                shutil.copystat(srcdir, destdir)
+        self._dirs_added.add(destdir)
+        if remove_from_remaining:
+            self._dirs_remaining.discard(destdir)
 
     def _dir_exists(self, d: Path):
         return d in self._dirs_added or d.exists()
-
-    def _create_dir(self, d: Path, remove_from_remaining: bool = True):
-        if not self._dir_exists(d):
-            self._create_dir(d.parent)
-            d.mkdir()  # TODO: copystat on dirs?
-        self._dirs_added.add(d)
-        if remove_from_remaining:
-            self._dirs_remaining.discard(d)
 
     def get_dest_path(self, path: Path):
         assert path.is_absolute()
@@ -84,10 +91,11 @@ class BackupExecutor:
 
     @classmethod
     def escape_string(cls, s: str):
-        def replacer(m: re.Match[str]):
-            num = ord(m.group(0))
-            if 0 <= num <= 255:
-                return f'+x{num:>02X}'
-            return f'+U{num:>08X}'
+        return cls.PATH_UNSAFE_RE.sub(cls.char_escape_repl, s)
 
-        return cls.PATH_UNSAFE_RE.sub(replacer, s)
+    @classmethod
+    def char_escape_repl(cls, m: re.Match[str]):
+        num = ord(m.group(0))
+        if 0 <= num <= 255:
+            return f'+x{num:>02X}'
+        return f'+U{num:>08X}'
