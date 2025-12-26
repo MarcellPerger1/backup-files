@@ -58,3 +58,11 @@ class AbstractExclude(AbstractInclusionRule, ABC):
 
     def get_clusivity(self) -> Clusivity:
         return Clusivity.EXCLUDE
+
+
+class AbstractIncludeExclude(AbstractInclude, AbstractExclude, ABC):
+    def __init__(self, clusivity: Clusivity):
+        self.clusivity = clusivity
+
+    def get_clusivity(self) -> Clusivity:
+        return self.clusivity
