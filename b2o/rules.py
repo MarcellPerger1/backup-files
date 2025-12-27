@@ -38,7 +38,8 @@ class FileExtExclude(AbstractExclude):
         self.allow_empty_prefix = allow_empty_prefix
 
     def should_exclude(self, path: Path) -> ExcludeMode | bool:
-        return any(self.matches_ext(path.name, e) for e in self.extensions)
+        return path.is_file() and any(
+            self.matches_ext(path.name, e) for e in self.extensions)
 
     def matches_ext(self, name: str, ext: str):
         return (name != ext or self.allow_empty_prefix) and name.endswith(ext)
