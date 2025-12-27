@@ -76,7 +76,7 @@ class ListFiles:
 
     def _visit_dir(self, dirpath: Path, dirnames: list[str], filenames: list[str],
                    excludes: list[AbstractExclude]):
-        excl_mode = self.get_exclude_mode(excludes, dirpath, FsType.DIR)
+        excl_mode = AbstractExclude.any(excludes, dirpath, FsType.DIR)
         if excl_mode.exclude_contents():
             dirnames.clear()  # Don't recurse into dirs
             filenames.clear()  # Don't add files
@@ -90,18 +90,8 @@ class ListFiles:
 
     def _add_file_with_excludes(self, excludes: list[AbstractExclude], file: Path):
         assert file.is_file(), "Expected a file, not dir/exotic"
-        if not self.get_exclude_mode(excludes, file, FsType.FILE):
+        if not AbstractExclude.any(excludes, file, FsType.FILE):
             self.add_file(file)
-
-    # noinspection PyMethodMayBeStatic
-    def get_exclude_mode(self, excludes: list[AbstractExclude], path: Path, fs_type: FsType):
-        result = ExcludeMode.NO
-        for e in excludes:
-            # Largest value (= largest amount excluded) wins
-            result = max(result, e.exclude_mode_for(path))
-            if result.is_completely_excluded(fs_type):
-                return ExcludeMode.ALL
-        return result
 
     def add_file(self, file: Path):
         if file in self.files:

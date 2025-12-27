@@ -5,7 +5,7 @@ from abc import ABC
 from collections.abc import Iterable
 from pathlib import Path
 
-from .common import Clusivity, ExcludeMode
+from .common import Clusivity, ExcludeMode, FsType
 
 
 class AbstractInclusionRule(ABC):
@@ -38,6 +38,10 @@ class AbstractInclude(AbstractInclusionRule, ABC):
 
 
 class AbstractExclude(AbstractInclusionRule, ABC):
+    @staticmethod
+    def any(excludes: Iterable[AbstractExclude], path: Path, fs_type: FsType) -> ExcludeMode:
+        return ExcludeMode.max((e.exclude_mode_for(path) for e in excludes), fs_type)
+
     @abc.abstractmethod
     def should_exclude(self, path: Path) -> ExcludeMode | bool:
         """Returns the ``ExcludeMode`` (or a ``bool``) for ``path``. If it

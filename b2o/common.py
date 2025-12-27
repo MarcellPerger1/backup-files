@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import StrEnum, IntEnum
 from pathlib import Path
 
@@ -31,7 +32,7 @@ class Clusivity(IntEnum):
 class ExcludeMode(IntEnum):
     # Note: inherits __bool__ from int
     NO = 0
-    CONTENTS = 1
+    CONTENTS = 1  # or SHALLOW
     ALL = 2
 
     def exclude_contents(self):
@@ -43,3 +44,21 @@ class ExcludeMode(IntEnum):
     def is_completely_excluded(self, fs_type: FsType):
         return (self == ExcludeMode.ALL or
                 (fs_type == FsType.FILE and self == ExcludeMode.CONTENTS))
+
+    @classmethod
+    def max(cls, modes: Iterable[ExcludeMode], fs_type: FsType):
+        result = ExcludeMode.NO
+        for m in modes:
+            result = max(result, m)
+            if result.is_completely_excluded(fs_type):
+                return ExcludeMode.ALL
+        return result
+
+    @classmethod
+    def min(cls, modes: Iterable[ExcludeMode]):
+        result = ExcludeMode.ALL
+        for m in modes:
+            result = min(result, m)
+            if result == ExcludeMode.NO:
+                return ExcludeMode.NO
+        return result
