@@ -47,6 +47,22 @@ def assert_not_exotic(p: Path):
     return AssertionError("Must not be an exotic fs object (e.g. symlink)")
 
 
+def is_subpath(sub: Path, sup: Path, resolve=False):
+    if resolve:
+        # NOTE: This doesn't take into account symlinks
+        sub = Path(os.path.abspath(sub))
+        sup = Path(os.path.abspath(sup))
+    return sub == sup or sup in sub.parents
+
+
+def innermost_stem(p: Path):
+    name = p.name
+    without_leading_dots = name.lstrip('.')
+    leading_dots = '.' * (len(name) - len(without_leading_dots))
+    stem_no_leading_dots, *_ = without_leading_dots.split('.', maxsplit=1)
+    return leading_dots + stem_no_leading_dots
+
+
 def get_path_root_and_drv(p: PT) -> PT:
     return Path(p).parents[-1]
 
