@@ -47,7 +47,7 @@ def assert_not_exotic(p: Path):
     return AssertionError("Must not be an exotic fs object (e.g. symlink)")
 
 
-def is_subpath(sub: Path, sup: Path, resolve=False):
+def is_subpath(sub: Path, sup: Path, resolve=True):
     if resolve:
         # NOTE: This doesn't take into account symlinks
         sub = Path(os.path.abspath(sub))

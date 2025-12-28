@@ -62,3 +62,63 @@ class ExcludeMode(IntEnum):
             if result == ExcludeMode.NO:
                 return ExcludeMode.NO
         return result
+
+
+class DeepBool(IntEnum):
+    NONE = 0
+    SHALLOW = 1
+    ALL = 2
+
+    def __invert__(self) -> DeepBool:
+        return type(self)(2 - self)
+
+    def __or__(self, other):
+        return max(self, other)
+
+    def __and__(self, other):
+        return min(self, other)
+
+    def normalize(self, fs_type: FsType):
+        if fs_type == FsType.FILE and self == DeepBool.SHALLOW:
+            return DeepBool.ALL
+        return self
+
+    def equals(self, other: DeepBool, fs_type: FsType):
+        return self.normalize(fs_type) == other.normalize(fs_type)
+
+    def is_max(self, fs_type: FsType):
+        return self >= self.lowest_maximum(fs_type)
+
+    @classmethod
+    def any(cls, bools: Iterable[DeepBool], fs_type: FsType = FsType.DIR):
+        # max(bools) but short-circuiting (next() may often be super-expensive)
+        result = cls.NONE
+        for b in bools:
+            result |= b
+            if result.is_max(fs_type):
+                return cls.ALL
+        return result
+
+    @classmethod
+    def all(cls, bools: Iterable[DeepBool]):
+        # min(bools) but short-circuiting (next() may often be super-expensive)
+        result = cls.ALL
+        for b in bools:
+            result &= b
+            if result == cls.NONE:
+                return result
+        return result
+
+    @classmethod
+    def from_is_excluded(cls, excl_mode: ExcludeMode):
+        return cls(excl_mode)
+
+    @classmethod
+    def from_not_excluded(cls, excl_mode: ExcludeMode):
+        return ~cls.from_is_excluded(excl_mode)
+
+    @classmethod
+    def lowest_maximum(cls, fs_type: FsType):
+        """Returns the smallest value v such that
+        ``v.normalize(fs_type) == DeepBool.ALL``"""
+        return cls.ALL if fs_type == FsType.DIR else cls.SHALLOW
