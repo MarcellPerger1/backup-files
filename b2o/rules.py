@@ -2,20 +2,23 @@ from pathlib import Path
 from typing import Iterable
 
 from .common import Clusivity, ExcludeMode
+from .condition import AbstractCondition, ConditionalPath, TrueCond
 from .py_util import is_subpath, innermost_stem
 from .rule import AbstractIncludeExclude, AbstractExclude
 
 
 class SpecificPathRule(AbstractIncludeExclude):
-    def __init__(self, clusivity: Clusivity, *paths: Path):
+    def __init__(self, clusivity: Clusivity, *paths: Path,
+                 condition: AbstractCondition = None):
         super().__init__(clusivity)
-        self.paths = paths
+        self.cond_paths = (condition or TrueCond()).apply_to(*paths)
 
-    def list_paths(self) -> Iterable[Path]:
-        return self.paths
+    def _list_paths(self) -> Iterable[ConditionalPath]:
+        return (self.cond_paths,)
 
     def should_exclude(self, path: Path) -> ExcludeMode | bool:
-        return any(is_subpath(path, p) for p in self.paths)
+        return any(is_subpath(path, p) and self.cond_paths.matches_subpath(path)
+                   for p in self.cond_paths.paths)
 
 
 class NameExclude(AbstractExclude):
