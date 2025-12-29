@@ -92,16 +92,16 @@ class TrueCond(AbstractCondition):
 
 
 class ConditionalPath:
-    def __init__(self, subpath_cond: AbstractCondition, *paths: Path):
-        self.paths = paths
+    def __init__(self, subpath_cond: AbstractCondition, path: Path):
+        self.path = path
         self.cond = subpath_cond
         """^ A condition that subpaths must meet to be included"""
 
     def matches_subpath(self, subpath: Path) -> DeepBool:
-        assert any(is_subpath(subpath, p) for p in self.paths)
+        assert is_subpath(subpath, self.path)
         return self.cond.evaluate(subpath)
 
     @classmethod
-    def unconditional(cls, *paths: Path):
+    def unconditional(cls, path: Path):
         # PERF: Cache TrueCond instance, perhaps make it a singleton class
-        return cls(TrueCond(), *paths)
+        return cls(TrueCond(), path)
