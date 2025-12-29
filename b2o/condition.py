@@ -54,6 +54,17 @@ class NotCond(AbstractCondition):
         return ~self.child.evaluate(p)
 
 
+class GroupCondition(AbstractCondition):
+    """Mainly useful for utility condition classes that want to compose
+    existing classes"""
+
+    def __init__(self, inner: AbstractCondition):
+        self.inner = inner
+
+    def _evaluate(self, p: Path) -> DeepBool:
+        return self.inner.evaluate(p)
+
+
 class IsExcluded(AbstractCondition):
     def __init__(self, *excludes: AbstractExclude):
         self.excludes = excludes
@@ -65,6 +76,11 @@ class IsExcluded(AbstractCondition):
         #       FsType.from_path
         return DeepBool.any((DeepBool.from_is_excluded(ex.exclude_mode_for(p))
                              for ex in self.excludes), FsType.from_path(p))
+
+
+class NotExcluded(GroupCondition):
+    def __init__(self, *excludes: AbstractExclude):
+        super().__init__(NotCond(IsExcluded(*excludes)))
 
 
 class ConditionalPath:
