@@ -23,6 +23,9 @@ class AbstractCondition(ABC):
     def and_(self, other: AbstractCondition):
         return AndCond(self, other)
 
+    def apply_to(self, *paths: Path):  # Just for nicer syntax
+        return ConditionalPath(self, *paths)
+
     @classmethod
     def bool_to_deep(cls, b: bool) -> DeepBool:
         """Used to convert bool results from ``_evaluate`` to ``DeepBool``s"""
@@ -83,6 +86,11 @@ class NotExcluded(GroupCondition):
         super().__init__(NotCond(IsExcluded(*excludes)))
 
 
+class TrueCond(AbstractCondition):
+    def _evaluate(self, p: Path) -> DeepBool | bool:
+        return DeepBool.ALL
+
+
 class ConditionalPath:
     def __init__(self, subpath_cond: AbstractCondition, *paths: Path):
         self.paths = paths
@@ -92,3 +100,8 @@ class ConditionalPath:
     def matches_subpath(self, subpath: Path) -> DeepBool:
         assert any(is_subpath(subpath, p) for p in self.paths)
         return self.cond.evaluate(subpath)
+
+    @classmethod
+    def unconditional(cls, *paths: Path):
+        # PERF: Cache TrueCond instance, perhaps make it a singleton class
+        return cls(TrueCond(), *paths)
