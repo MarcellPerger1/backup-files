@@ -5,6 +5,7 @@ from __future__ import annotations
 import itertools
 import math
 import os
+import os.path
 import sys
 from pathlib import Path, PurePath
 from typing import TypeVar, TypeGuard, Iterable, Callable, Iterator

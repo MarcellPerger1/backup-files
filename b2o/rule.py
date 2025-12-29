@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from .common import Clusivity, ExcludeMode, FsType
+from .condition import ConditionalPath
 
 
 class AbstractInclusionRule(ABC):
@@ -30,8 +31,14 @@ class AbstractInclusionRule(ABC):
 
 class AbstractInclude(AbstractInclusionRule, ABC):
     @abc.abstractmethod
-    def list_paths(self) -> Iterable[Path]:
+    def _list_paths(self) -> Iterable[Path | ConditionalPath]:
         """Lists the paths matching this rule"""
+
+    def list_paths(self) -> Iterable[ConditionalPath]:
+        """Return paths matching this rule with their conditions"""
+        return (p if isinstance(p, ConditionalPath)
+                else ConditionalPath.unconditional(p)
+                for p in self._list_paths())
 
     def get_clusivity(self) -> Clusivity:
         return Clusivity.INCLUDE
