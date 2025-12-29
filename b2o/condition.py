@@ -20,6 +20,9 @@ class AbstractCondition(ABC):
             return result
         return self.bool_to_deep(result)
 
+    def and_(self, other: AbstractCondition):
+        return AndCond(self, other)
+
     @classmethod
     def bool_to_deep(cls, b: bool) -> DeepBool:
         """Used to convert bool results from ``_evaluate`` to ``DeepBool``s"""
