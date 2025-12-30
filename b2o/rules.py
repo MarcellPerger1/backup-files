@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterable
 
-from .common import Clusivity, ExcludeMode
+from .common import Clusivity, DeepBool
 from .condition import AbstractCondition, ConditionalPath, TrueCond
 from .fs_util import is_subpath, innermost_stem
 from .rule import AbstractIncludeExclude, AbstractExclude
@@ -16,7 +16,7 @@ class SpecificPathRule(AbstractIncludeExclude):
     def _list_paths(self) -> Iterable[ConditionalPath]:
         return (self.cond_paths,)
 
-    def should_exclude(self, path: Path) -> ExcludeMode | bool:
+    def should_exclude(self, path: Path) -> DeepBool | bool:
         return any(is_subpath(path, p) and self.cond_paths.matches_subpath(path)
                    for p in self.cond_paths.paths)
 
@@ -30,7 +30,7 @@ class NameExclude(AbstractExclude):
     def fallback_keep_self(self, path: Path):
         return self.keep_dir_self
 
-    def should_exclude(self, path: Path) -> ExcludeMode | bool:
+    def should_exclude(self, path: Path) -> DeepBool | bool:
         name = path.name if not self.strip_suffixes else innermost_stem(path)
         return name in self.names
 
@@ -40,7 +40,7 @@ class FileExtExclude(AbstractExclude):
         self.extensions = ['.' + e.removeprefix('.') for e in extensions]
         self.allow_empty_prefix = allow_empty_prefix
 
-    def should_exclude(self, path: Path) -> ExcludeMode | bool:
+    def should_exclude(self, path: Path) -> DeepBool | bool:
         return path.is_file() and any(
             self.matches_ext(path.name, e) for e in self.extensions)
 

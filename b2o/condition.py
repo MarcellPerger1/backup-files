@@ -78,8 +78,8 @@ class IsExcluded(AbstractCondition):
         # PERF: map + methodcaller might be more efficient
         # PERF: We should pass fs_type as possibly-optional or at least cache
         #       FsType.from_path
-        return DeepBool.any((DeepBool.from_is_excluded(ex.exclude_mode_for(p))
-                             for ex in self.excludes), FsType.from_path(p))
+        return DeepBool.any((ex.exclude_mode_for(p) for ex in self.excludes),
+                            FsType.from_path(p))
 
 
 class NotExcluded(GroupCondition):

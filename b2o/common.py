@@ -28,41 +28,6 @@ class Clusivity(IntEnum):
     INCLUDE = 1
 
 
-class ExcludeMode(IntEnum):
-    # Note: inherits __bool__ from int
-    NO = 0
-    CONTENTS = 1  # or SHALLOW
-    ALL = 2
-
-    def exclude_contents(self):
-        return self >= ExcludeMode.CONTENTS
-
-    def exclude_self(self):
-        return self >= ExcludeMode.ALL
-
-    def is_completely_excluded(self, fs_type: FsType):
-        return (self == ExcludeMode.ALL or
-                (fs_type == FsType.FILE and self == ExcludeMode.CONTENTS))
-
-    @classmethod
-    def max(cls, modes: Iterable[ExcludeMode], fs_type: FsType):
-        result = ExcludeMode.NO
-        for m in modes:
-            result = max(result, m)
-            if result.is_completely_excluded(fs_type):
-                return ExcludeMode.ALL
-        return result
-
-    @classmethod
-    def min(cls, modes: Iterable[ExcludeMode]):
-        result = ExcludeMode.ALL
-        for m in modes:
-            result = min(result, m)
-            if result == ExcludeMode.NO:
-                return ExcludeMode.NO
-        return result
-
-
 class DeepBool(IntEnum):
     NONE = 0
     SHALLOW = 1
@@ -107,14 +72,6 @@ class DeepBool(IntEnum):
             if result == cls.NONE:
                 return result
         return result
-
-    @classmethod
-    def from_is_excluded(cls, excl_mode: ExcludeMode):
-        return cls(excl_mode)
-
-    @classmethod
-    def from_not_excluded(cls, excl_mode: ExcludeMode):
-        return ~cls.from_is_excluded(excl_mode)
 
     @classmethod
     def lowest_maximum(cls, fs_type: FsType):
