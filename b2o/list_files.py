@@ -27,8 +27,7 @@ class ListFiles:
         """^ WARNING: this won't add the contents/files in each of these,
         just the dirs themselves"""
         self.files: set[Path] = set()
-        # REFACTOR: files and dirs should really be in a single object?
-        self._added: set[Path] = set()
+        # REFACTOR: could files and dirs should be in a single object?
 
     def list_files(self):
         include_blocks, exclude_blocks = self._group_declarations()
@@ -71,8 +70,8 @@ class ListFiles:
             self._walk_conditional_path(cp, cp.path)
 
     def _walk_conditional_path(self, root: ConditionalPath, path: Path):
-        if path in self._added:
-            return
+        # NOTE: Can't check for _added for dirs as different subfiles maybe
+        # be added from different conditions
         if FsType.from_path(path) == FsType.FILE:
             return self._add_conditional_file(root, path)
         self._add_conditional_dir(root, path)
@@ -94,7 +93,7 @@ class ListFiles:
             self._walk_conditional_path(cp_root, ch)
 
     def _add_conditional_file(self, cp_root: ConditionalPath, f: Path):
-        if cp_root.matches_subpath(f):
+        if f not in self.files and cp_root.matches_subpath(f):
             self.add_file(f)
 
     def add_file(self, file: Path):
@@ -102,7 +101,6 @@ class ListFiles:
             return
         self.stats.add_file(file)
         self.files.add(file)
-        self._added.add(file)
 
     def add_dir_only(self, path: Path):
         """WARNING: doesn't add children, only the dir itself"""
@@ -110,7 +108,6 @@ class ListFiles:
             return
         self.stats.add_dir(path)
         self.dirs.add(path)
-        self._added.add(path)
 
     def remove_file(self, file: Path):
         # Note: don't use internally - should not have been added
