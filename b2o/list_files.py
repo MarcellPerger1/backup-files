@@ -5,9 +5,10 @@ import os.path
 from pathlib import Path
 from typing import Sequence
 
+from .condition import AbstractCondition, ConditionalPath, OrCond, NotExcluded
 from .py_util import flatten, group_by, assert_not_exotic
 from .stats import Stats
-from .common import ExcludeMode, Clusivity, FsType
+from .common import Clusivity, FsType, DeepBool
 from .rule import AbstractInclusionRule, AbstractInclude, AbstractExclude
 
 _IEBlocksTup = tuple[list[list[AbstractInclude]], list[list[AbstractExclude]]]
@@ -20,10 +21,15 @@ class ListFiles:
     def __init__(self, *decls: AbstractInclusionRule):
         self.decls: list[AbstractInclusionRule] = list(decls)
         self.stats = Stats()
+        # PERF: Is the RAM tradeoff really worth it? A generator might
+        # be better and then later code just checks the destination
+        # to see if it exists or something.
         self.dirs: set[Path] = set()
         """^ WARNING: this won't add the contents/files in each of these,
         just the dirs themselves"""
         self.files: set[Path] = set()
+        # REFACTOR: files and dirs should really be in a single object?
+        self._added: set[Path] = set()
 
     def list_files(self):
         include_blocks, exclude_blocks = self._group_declarations()
@@ -53,17 +59,44 @@ class ListFiles:
               excludes: Sequence[AbstractExclude]):
         """Lists all files and dirs, adding ``includes - excludes`` to self"""
         excludes = list(excludes)
-        roots = set()
+        cond_roots: dict[Path, list[AbstractCondition]] = {}
         for o in includes:
-            for p in o.list_paths():
-                assert_not_exotic(p)
-                if p.is_file():
-                    self._add_file_with_excludes(excludes, p)
-                else:
-                    roots.add(p)
-        return self._walk_roots(roots, excludes)
+            for cp in o.list_paths():
+                assert_not_exotic(cp.path)
+                cond_roots.setdefault(cp.path, []).append(cp.cond)
+        return self._walk_paths([
+            OrCond(*conds).and_(NotExcluded(*excludes)).apply_to(p)
+            for p, conds in cond_roots.items()])
+
+    def _walk_paths(self, paths: list[ConditionalPath]):
+        for cp in paths:
+            self._walk_conditional_path(cp, cp.path)
+
+    def _walk_conditional_path(self, root: ConditionalPath, path: Path):
+        if path in self._added:
+            return
+        if FsType.from_path(path) == FsType.FILE:
+            return self._add_conditional_file(root, path)
+        # PERF: scandir would be faster
+        self._add_conditional_dir(root, path)
+
+    def _add_conditional_dir(self, cp_root: ConditionalPath, d: Path):
+        # TODO: how to handle EACCES errors? (permission denied)
+        incl_mode = cp_root.matches_subpath(d)
+        if incl_mode < DeepBool.SHALLOW:
+            return
+        self.add_dir_only(d)
+        if incl_mode < DeepBool.ALL:
+            return
+        for ch in d.iterdir():
+            self._walk_conditional_path(cp_root, ch)
+
+    def _add_conditional_file(self, cp_root: ConditionalPath, f: Path):
+        if cp_root.matches_subpath(f):
+            self.add_file(f)
 
     def _walk_roots(self, roots: set[Path], excludes: list[AbstractExclude]):
+        # TODO: handle files here
         visited_dirs: set[Path] = set()
         for root in roots:
             assert root.is_dir(), "Cannot have a non-dir root in _walk"
@@ -98,6 +131,7 @@ class ListFiles:
             return
         self.stats.add_file(file)
         self.files.add(file)
+        self._added.add(file)
 
     def add_dir_only(self, path: Path):
         """WARNING: doesn't add children, only the dir itself"""
@@ -105,6 +139,7 @@ class ListFiles:
             return
         self.stats.add_dir(path)
         self.dirs.add(path)
+        self._added.add(path)
 
     def remove_file(self, file: Path):
         # Note: don't use internally - should not have been added

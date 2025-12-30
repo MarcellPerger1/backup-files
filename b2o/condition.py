@@ -34,6 +34,7 @@ class AbstractCondition(ABC):
 
 class OrCond(AbstractCondition):
     def __init__(self, *children: AbstractCondition):
+        # PERF: in __new__() check for one-arg case and return arg
         self.children = children
 
     def _evaluate(self, p: Path) -> DeepBool:
