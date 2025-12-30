@@ -77,54 +77,27 @@ class ListFiles:
             return
         if FsType.from_path(path) == FsType.FILE:
             return self._add_conditional_file(root, path)
-        # PERF: scandir would be faster
         self._add_conditional_dir(root, path)
 
     def _add_conditional_dir(self, cp_root: ConditionalPath, d: Path):
-        # TODO: how to handle EACCES errors? (permission denied)
+        # TODO: how to handle EACCES errors? (permission denied). First,
+        #  we need to test where they're actually raised first.
         incl_mode = cp_root.matches_subpath(d)
         if incl_mode < DeepBool.SHALLOW:
             return
         self.add_dir_only(d)
         if incl_mode < DeepBool.ALL:
             return
+        # PERF: scandir would be faster but requires a lot unnecessary
+        #  argument-passing.
+        # PERF: REFACTOR: We should make a subclass of Path or similar
+        #  that caches various attributes about the object (e.g. FsType)
         for ch in d.iterdir():
             self._walk_conditional_path(cp_root, ch)
 
     def _add_conditional_file(self, cp_root: ConditionalPath, f: Path):
         if cp_root.matches_subpath(f):
             self.add_file(f)
-
-    def _walk_roots(self, roots: set[Path], excludes: list[AbstractExclude]):
-        # TODO: handle files here
-        visited_dirs: set[Path] = set()
-        for root in roots:
-            assert root.is_dir(), "Cannot have a non-dir root in _walk"
-            for dir_str, dirs, files in os.walk(root.expanduser().resolve()):
-                if (dirpath := Path(dir_str).resolve()) in visited_dirs:
-                    dirs.clear()  # Already visited this tree, don't visit children
-                    continue
-                visited_dirs.add(dirpath)
-                self._visit_dir(dirpath, dirs, files, excludes)
-
-    def _visit_dir(self, dirpath: Path, dirnames: list[str], filenames: list[str],
-                   excludes: list[AbstractExclude]):
-        excl_mode = AbstractExclude.any(excludes, dirpath, FsType.DIR)
-        if excl_mode.exclude_contents():
-            dirnames.clear()  # Don't recurse into dirs
-            filenames.clear()  # Don't add files
-        if excl_mode.exclude_self():
-            return  # Don't add self (skip the code below)
-        self.add_dir_only(dirpath)
-        for file in filenames:
-            self._add_file_with_excludes(excludes, dirpath / file)
-        # Don't do anything with the dirs here, will handle them
-        #  when os.walk() recursively goes into them (topdown)
-
-    def _add_file_with_excludes(self, excludes: list[AbstractExclude], file: Path):
-        assert file.is_file(), "Expected a file, not dir/exotic"
-        if not AbstractExclude.any(excludes, file, FsType.FILE):
-            self.add_file(file)
 
     def add_file(self, file: Path):
         if file in self.files:
