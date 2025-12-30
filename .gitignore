@@ -1,3 +1,6 @@
+# My own random semi-related files, like perf tests, etc.
+_exclude/
+
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm,windows
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pycharm,windows
 
