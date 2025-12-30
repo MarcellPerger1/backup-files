@@ -5,7 +5,6 @@ from typing import Sequence
 
 from .condition import AbstractCondition, ConditionalPath, OrCond, NotExcluded
 from .py_util import flatten, group_by
-from .fs_util import assert_not_exotic
 from .stats import Stats
 from .common import Clusivity, FsType, DeepBool
 from .rule import AbstractInclusionRule, AbstractInclude, AbstractExclude
@@ -61,7 +60,6 @@ class ListFiles:
         cond_roots: dict[Path, list[AbstractCondition]] = {}
         for o in includes:
             for cp in o.list_paths():
-                assert_not_exotic(cp.path)
                 cond_roots.setdefault(cp.path, []).append(cp.cond)
         return self._walk_paths([
             OrCond(*conds).and_(NotExcluded(*excludes)).apply_to(p)

@@ -4,8 +4,6 @@ from collections.abc import Iterable
 from enum import StrEnum, IntEnum
 from pathlib import Path
 
-from .fs_util import assert_not_exotic
-
 
 class FsType(StrEnum):
     FILE = 'file'
@@ -18,7 +16,8 @@ class FsType(StrEnum):
             return cls.FILE
         if path.is_dir():
             return cls.DIR
-        raise assert_not_exotic(path)
+        raise OSError("FsType (and b2o in general) cannot handle exotic"
+                      " objects (e.g. symlinks)")
 
     def matches_path(self, path: Path):
         return self == FsType.from_path(path)

@@ -12,7 +12,6 @@ PT = TypeVar('PT', bound=PurePath)
 def assert_not_exotic(p: Path):
     """Assert that ``p`` is a regular file or directory."""
     assert p.is_file() or p.is_dir(), "Must not be an exotic fs object (e.g. symlink)"
-    return AssertionError("Must not be an exotic fs object (e.g. symlink)")
 
 
 def is_subpath(sub: Path, sup: Path, resolve=True):
