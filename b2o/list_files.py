@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Sequence
+from collections.abc import Sequence
 
-from .condition import AbstractCondition, ConditionalPath
+from .common import Clusivity, FsType, DeepBool
+from .condition import AbstractCondition, ConditionalPath  # type-only
 from .conditions import OrCond, NotExcluded
 from .py_util import flatten, group_by
+from .rule import AbstractInclusionRule, AbstractInclude, AbstractExclude  # type-only
 from .stats import Stats
-from .common import Clusivity, FsType, DeepBool
-from .rule import AbstractInclusionRule, AbstractInclude, AbstractExclude
 
 _IEBlocksTup = tuple[list[list[AbstractInclude]], list[list[AbstractExclude]]]
 

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from .common import Clusivity, DeepBool
 from .condition import AbstractCondition, ConditionalPath

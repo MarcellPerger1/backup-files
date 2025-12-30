@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import itertools
-from typing import TypeVar, TypeGuard, Iterable, Callable, Iterator
+from collections.abc import Iterable, Callable, Iterator
+from typing import TypeVar, TypeGuard
 
 T = TypeVar('T')
 KT = TypeVar('KT')
