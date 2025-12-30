@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import os
-import os.path
 from pathlib import Path
 from typing import Sequence
 
 from .condition import AbstractCondition, ConditionalPath, OrCond, NotExcluded
-from .py_util import flatten, group_by, assert_not_exotic
+from .py_util import flatten, group_by
+from .fs_util import assert_not_exotic
 from .stats import Stats
 from .common import Clusivity, FsType, DeepBool
 from .rule import AbstractInclusionRule, AbstractInclude, AbstractExclude

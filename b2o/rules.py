@@ -3,7 +3,7 @@ from typing import Iterable
 
 from .common import Clusivity, ExcludeMode
 from .condition import AbstractCondition, ConditionalPath, TrueCond
-from .py_util import is_subpath, innermost_stem
+from .fs_util import is_subpath, innermost_stem
 from .rule import AbstractIncludeExclude, AbstractExclude
 
 

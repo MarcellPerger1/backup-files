@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from enum import StrEnum, IntEnum
 from pathlib import Path
 
-from .py_util import assert_not_exotic
+from .fs_util import assert_not_exotic
 
 
 class FsType(StrEnum):

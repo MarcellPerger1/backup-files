@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 from .common import FsType, DeepBool
-from .py_util import is_subpath
+from .fs_util import is_subpath
 from .rule import AbstractExclude  # XXX: circular import problems here?
 
 

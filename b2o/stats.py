@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .py_util import get_size_on_disk
+from .fs_util import get_size_on_disk
 
 
 class Stats:
