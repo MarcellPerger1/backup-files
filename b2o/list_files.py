@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Sequence
 
-from .condition import AbstractCondition, ConditionalPath, OrCond, NotExcluded
+from .condition import AbstractCondition, ConditionalPath
+from .conditions import OrCond, NotExcluded
 from .py_util import flatten, group_by
 from .stats import Stats
 from .common import Clusivity, FsType, DeepBool

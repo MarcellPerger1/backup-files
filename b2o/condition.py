@@ -3,9 +3,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from .common import FsType, DeepBool
+# XXX: This is meant to solve the circular import problem. Does it work? Must test this.
+from . import conditions
+from .common import DeepBool
 from .fs_util import is_subpath
-from .rule import AbstractExclude  # XXX: circular import problems here?
 
 
 # This technically doesn't need to be with DeepBool but I think efficiency might
@@ -21,10 +22,10 @@ class AbstractCondition(ABC):
         return self.bool_to_deep(result)
 
     def and_(self, other: AbstractCondition):
-        return AndCond(self, other)
+        return conditions.AndCond(self, other)
 
-    def apply_to(self, *paths: Path):  # Just for nicer syntax
-        return ConditionalPath(self, *paths)
+    def apply_to(self, path: Path):  # Just for nicer syntax
+        return ConditionalPath(path, self)
 
     @classmethod
     def bool_to_deep(cls, b: bool) -> DeepBool:
@@ -32,77 +33,14 @@ class AbstractCondition(ABC):
         return DeepBool.ALL if b else DeepBool.NONE
 
 
-class OrCond(AbstractCondition):
-    def __init__(self, *children: AbstractCondition):
-        # PERF: in __new__() check for one-arg case and return arg
-        self.children = children
-
-    def _evaluate(self, p: Path) -> DeepBool:
-        # PERF: `methodcaller` might be faster due to C vectorcall stuff
-        return DeepBool.any(c.evaluate(p) for c in self.children)
-
-
-class AndCond(AbstractCondition):
-    def __init__(self, *children: AbstractCondition):
-        self.children = children
-
-    def _evaluate(self, p: Path) -> DeepBool:
-        return DeepBool.all(c.evaluate(p) for c in self.children)
-
-
-class NotCond(AbstractCondition):
-    def __init__(self, child: AbstractCondition):
-        self.child = child
-
-    def _evaluate(self, p: Path) -> DeepBool:
-        return ~self.child.evaluate(p)
-
-
-class GroupCondition(AbstractCondition):
-    """Mainly useful for utility condition classes that want to compose
-    existing classes"""
-
-    def __init__(self, inner: AbstractCondition):
-        self.inner = inner
-
-    def _evaluate(self, p: Path) -> DeepBool:
-        return self.inner.evaluate(p)
-
-
-class IsExcluded(AbstractCondition):
-    def __init__(self, *excludes: AbstractExclude):
-        self.excludes = excludes
-
-    def _evaluate(self, p: Path) -> DeepBool:
-        # NOTE: Doesn't check whether it's excluded due to the parent paths
-        # PERF: map + methodcaller might be more efficient
-        # PERF: We should pass fs_type as possibly-optional or at least cache
-        #       FsType.from_path
-        return DeepBool.any((ex.exclude_mode_for(p) for ex in self.excludes),
-                            FsType.from_path(p))
-
-
-class NotExcluded(GroupCondition):
-    def __init__(self, *excludes: AbstractExclude):
-        super().__init__(NotCond(IsExcluded(*excludes)))
-
-
-class TrueCond(AbstractCondition):
-    def _evaluate(self, p: Path) -> DeepBool | bool:
-        return DeepBool.ALL
-
-
 class ConditionalPath:
-    def __init__(self, subpath_cond: AbstractCondition, path: Path):
+    def __init__(self, path: Path, subpath_cond: AbstractCondition | None = None):
         self.path = path
-        self.cond = subpath_cond
+        # PERF: Cache default TrueCond instance, perhaps make TrueCond
+        # into a singleton class - unconditional will be quite common
+        self.cond = subpath_cond or conditions.TrueCond()
         """^ A condition that subpaths must meet to be included"""
 
     def matches_subpath(self, subpath: Path) -> DeepBool:
         assert is_subpath(subpath, self.path)
         return self.cond.evaluate(subpath)
-
-    @classmethod
-    def unconditional(cls, path: Path):
-        # PERF: Cache TrueCond instance, perhaps make it a singleton class
-        return cls(TrueCond(), path)

@@ -36,8 +36,7 @@ class AbstractInclude(AbstractInclusionRule, ABC):
 
     def list_paths(self) -> Iterable[ConditionalPath]:
         """Return paths matching this rule with their conditions"""
-        return (p if isinstance(p, ConditionalPath)
-                else ConditionalPath.unconditional(p)
+        return (p if isinstance(p, ConditionalPath) else ConditionalPath(p)
                 for p in self._list_paths())
 
     def get_clusivity(self) -> Clusivity:
